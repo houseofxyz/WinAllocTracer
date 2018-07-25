@@ -4,5 +4,5 @@
 * This `Pintool` allows you to log and track calls to `RtlAllocateHeap`, `RtlReAllocateHeap`, `RtlFreeHeap`, `VirtualAllocEx`, and `VirtualFreeEx`.
 * Currently warns about potential `invalid allocations`, `double frees`, and `memory leaks`.
 
-For more information read: [http://deniable.org/binary-instrumentation](http://deniable.org/binary-instrumentation).
+For more information read: [http://deniable.org/reversing/binary-instrumentation](http://deniable.org/reversing/binary-instrumentation).
 
