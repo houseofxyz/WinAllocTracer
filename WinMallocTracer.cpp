@@ -63,7 +63,7 @@ VOID LogBeforeVirtualFree(ADDRINT addr, ADDRINT ret)
   if (it != MallocMap.end())
   {
     if (it->second)
-      LogFile << "[*] Memory at address 0x" << hex << addr << " has been freed more than once (Double Free)." << endl;
+      LogFile << "[*] Memory at address 0x" << hex << addr << " has been freed more than once (double free)." << endl;
     else
     {
       it->second = true;    // Mark it as freed
@@ -71,10 +71,10 @@ VOID LogBeforeVirtualFree(ADDRINT addr, ADDRINT ret)
     }
   }
   else
-    LogFile << "[*] Freeing unallocated memory at address 0x" << hex << addr << "." << endl;
+    LogFile << "[*] Freeing unallocated memory at address 0x" << hex << addr << " (invalid free)." << endl;
 }
 
-VOID LogBeforeReAlloc(ADDRINT freed_addr, ADDRINT size, ADDRINT ret)
+VOID LogBeforeReAlloc(WINDOWS::HANDLE hHeap, WINDOWS::DWORD dwFlags, ADDRINT freed_addr, WINDOWS::DWORD dwBytes, ADDRINT ret)
 {
   if (!start_trace)
     return;
@@ -90,7 +90,7 @@ VOID LogBeforeReAlloc(ADDRINT freed_addr, ADDRINT size, ADDRINT ret)
   else
     LogFile << "[-] RtlHeapRealloc could not find addr to free??? - " << freed_addr << endl;
 
-  LogFile << "[*] RtlHeapReAlloc(" << dec << size << ")";
+  LogFile << "[*] RtlHeapReAlloc(" << hex << hHeap << ", " << dwFlags << ", 0x" << hex << freed_addr << ", " << dec << dwBytes << ")";
 }
 
 VOID LogAfterReAlloc(ADDRINT addr, ADDRINT ret)
@@ -158,7 +158,7 @@ VOID LogFree(ADDRINT addr, ADDRINT ret)
   if (it != MallocMap.end())
   {
     if (it->second)
-      LogFile << "[*] Memory at address 0x" << hex << addr << " has been freed more than once (Double Free)." << endl;
+      LogFile << "[*] Memory at address 0x" << hex << addr << " has been freed more than once (double free)." << endl;
     else
     {
       it->second = true;    // Mark it as freed
@@ -166,7 +166,7 @@ VOID LogFree(ADDRINT addr, ADDRINT ret)
     }
   }
   else
-    LogFile << "[*] Freeing unallocated memory at address 0x" << hex << addr << "." << endl;
+    LogFile << "[*] Freeing unallocated memory at address 0x" << hex << addr << " (invalid free)." << endl;
 }
 
 VOID BeforeMain() {
@@ -229,6 +229,11 @@ VOID CustomInstrumentation(IMG img, VOID *v)
       {
         RTN_Open(allocRtn);
         
+        //NTSYSAPI PVOID RtlAllocateHeap(
+        //  PVOID  HeapHandle,
+        //  ULONG  Flags,
+        //  SIZE_T Size
+        //);
         RTN_InsertCall(allocRtn, IPOINT_BEFORE, (AFUNPTR)LogBeforeMalloc,
           IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
           IARG_FUNCARG_ENTRYPOINT_VALUE, 1,
@@ -236,7 +241,7 @@ VOID CustomInstrumentation(IMG img, VOID *v)
           IARG_RETURN_IP,
           IARG_END);
 
-        // Record RtlAllocateHeap return address
+        // Record RtlAllocateHeap return address and IP of caller function
         RTN_InsertCall(allocRtn, IPOINT_AFTER, (AFUNPTR)LogAfterMalloc,
           IARG_FUNCRET_EXITPOINT_VALUE, IARG_RETURN_IP, IARG_END);
         
@@ -251,11 +256,20 @@ VOID CustomInstrumentation(IMG img, VOID *v)
       {
         RTN_Open(reallocRtn);
 
-        // Record RtlReAllocateHeap freed_addr, size
+        //NTSYSAPI PVOID RtlReAllocateHeap(
+        //  IN PVOID  HeapHandle,
+        //  IN ULONG  Flags,
+        //  IN PVOID  MemoryPointer,
+        //  IN ULONG  Size);
         RTN_InsertCall(reallocRtn, IPOINT_BEFORE, (AFUNPTR)LogBeforeReAlloc,
-          IARG_FUNCARG_ENTRYPOINT_VALUE, 2, IARG_FUNCARG_ENTRYPOINT_VALUE, 3, IARG_RETURN_IP, IARG_END);
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 1,
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 2,
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 3,
+          IARG_RETURN_IP,
+          IARG_END);
 
-        // Record RtlReAllocateHeap return address
+        // Record RtlReAllocateHeap return address and IP of caller function
         RTN_InsertCall(reallocRtn, IPOINT_AFTER, (AFUNPTR)LogAfterReAlloc,
           IARG_FUNCRET_EXITPOINT_VALUE, IARG_RETURN_IP, IARG_END);
 
@@ -270,6 +284,11 @@ VOID CustomInstrumentation(IMG img, VOID *v)
       {
         RTN_Open(freeRtn);
 
+        //NTSYSAPI LOGICAL RtlFreeHeap(
+        //  PVOID                 HeapHandle,
+        //  ULONG                 Flags,
+        //  _Frees_ptr_opt_ PVOID BaseAddress
+        //);
         RTN_InsertCall(freeRtn, IPOINT_BEFORE, (AFUNPTR)LogFree,
           IARG_FUNCARG_ENTRYPOINT_VALUE, 2, IARG_RETURN_IP,
           IARG_END);
@@ -285,6 +304,13 @@ VOID CustomInstrumentation(IMG img, VOID *v)
       {
         RTN_Open(vrallocRtn);
 
+        //LPVOID WINAPI VirtualAllocEx(
+        //  _In_     HANDLE hProcess,
+        //  _In_opt_ LPVOID lpAddress,
+        //  _In_     SIZE_T dwSize,
+        //  _In_     DWORD  flAllocationType,
+        //  _In_     DWORD  flProtect
+        //);
         RTN_InsertCall(vrallocRtn, IPOINT_BEFORE, (AFUNPTR)LogBeforeVirtualAlloc,
           IARG_FUNCARG_ENTRYPOINT_VALUE, 2, IARG_RETURN_IP, IARG_END);
 
@@ -302,6 +328,12 @@ VOID CustomInstrumentation(IMG img, VOID *v)
       {
         RTN_Open(vrfreeRtn);
 
+        //BOOL WINAPI VirtualFreeEx(
+        //  _In_ HANDLE hProcess,
+        //  _In_ LPVOID lpAddress,
+        //  _In_ SIZE_T dwSize,
+        //  _In_ DWORD  dwFreeType
+        //);
         RTN_InsertCall(vrfreeRtn, IPOINT_BEFORE, (AFUNPTR)LogBeforeVirtualFree,
           IARG_FUNCARG_ENTRYPOINT_VALUE, 1, IARG_RETURN_IP, IARG_END);
 
@@ -316,7 +348,7 @@ VOID FinalFunc(INT32 code, VOID *v)
   for (pair<ADDRINT, bool> p : MallocMap)
   {
     if (!p.second)
-      LogFile << "[*] Memory at address 0x" << hex << p.first << " allocated but not freed" << endl;
+      LogFile << "[*] Memory at address 0x" << hex << p.first << " allocated but not freed (memory leak)" << endl;
   }
 
   LogFile.close();
