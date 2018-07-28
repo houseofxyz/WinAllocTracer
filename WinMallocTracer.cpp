@@ -1,7 +1,15 @@
 #include "pin.h"
+
+namespace WINDOWS
+{
+#include <windows.h>
+}
+
 #include <iostream>
 #include <fstream>
 #include <map>
+
+using namespace std;
 
 map<ADDRINT, bool> MallocMap;
 ofstream LogFile;
@@ -10,7 +18,7 @@ KNOB<string> EntryPoint(KNOB_MODE_WRITEONCE, "pintool", "entrypoint", "main", "G
 KNOB<BOOL> EnumSymbols(KNOB_MODE_WRITEONCE, "pintool", "symbols", "0", "List Symbols");
 BOOL start_trace = false;
 
-VOID LogBeforeVirtualAlloc(ADDRINT size)
+VOID LogBeforeVirtualAlloc(ADDRINT size, ADDRINT ret)
 {
   if (!start_trace)
     return;
@@ -18,7 +26,7 @@ VOID LogBeforeVirtualAlloc(ADDRINT size)
   LogFile << "[*] VirtualAllocEx(" << dec << size << ")";
 }
 
-VOID LogAfterVirtualAlloc(ADDRINT addr)
+VOID LogAfterVirtualAlloc(ADDRINT addr, ADDRINT ret)
 {
   if (!start_trace)
     return;
@@ -45,7 +53,7 @@ VOID LogAfterVirtualAlloc(ADDRINT addr)
   }
 }
 
-VOID LogBeforeVirtualFree(ADDRINT addr)
+VOID LogBeforeVirtualFree(ADDRINT addr, ADDRINT ret)
 {
   if (!start_trace)
     return;
@@ -66,7 +74,7 @@ VOID LogBeforeVirtualFree(ADDRINT addr)
     LogFile << "[*] Freeing unallocated memory at address 0x" << hex << addr << "." << endl;
 }
 
-VOID LogBeforeReAlloc(ADDRINT freed_addr, ADDRINT size)
+VOID LogBeforeReAlloc(ADDRINT freed_addr, ADDRINT size, ADDRINT ret)
 {
   if (!start_trace)
     return;
@@ -77,7 +85,7 @@ VOID LogBeforeReAlloc(ADDRINT freed_addr, ADDRINT size)
   if (it != MallocMap.end())
   {
     it->second = true;
-    LogFile << "[*] RtlHeapfree(0x" << hex << freed_addr << ") from RtlHeapRealloc()" << endl;
+    LogFile << "[*] RtlFreeHeap(0x" << hex << freed_addr << ") from RtlHeapRealloc()" << endl;
   }
   else
     LogFile << "[-] RtlHeapRealloc could not find addr to free??? - " << freed_addr << endl;
@@ -85,7 +93,7 @@ VOID LogBeforeReAlloc(ADDRINT freed_addr, ADDRINT size)
   LogFile << "[*] RtlHeapReAlloc(" << dec << size << ")";
 }
 
-VOID LogAfterReAlloc(ADDRINT addr)
+VOID LogAfterReAlloc(ADDRINT addr, ADDRINT ret)
 {
   if (!start_trace)
     return;
@@ -105,15 +113,15 @@ VOID LogAfterReAlloc(ADDRINT addr)
   }
 }
 
-VOID LogBeforeMalloc(ADDRINT size)
+VOID LogBeforeMalloc(WINDOWS::HANDLE hHeap, WINDOWS::DWORD dwFlags, WINDOWS::DWORD dwBytes, ADDRINT ret)
 {
   if (!start_trace)
     return;
 
-  LogFile << "[*] RtlAllocateHeap(" << dec << size << ")";
+  LogFile << "[*] RtlAllocateHeap(" << hex << hHeap << ", " << dwFlags << ", " << dec << dwBytes << ")";
 }
 
-VOID LogAfterMalloc(ADDRINT addr)
+VOID LogAfterMalloc(ADDRINT addr, ADDRINT ret)
 {
   if (!start_trace)
     return;
@@ -140,7 +148,7 @@ VOID LogAfterMalloc(ADDRINT addr)
   }
 }
 
-VOID LogFree(ADDRINT addr)
+VOID LogFree(ADDRINT addr, ADDRINT ret)
 {
   if (!start_trace)
     return;
@@ -221,13 +229,16 @@ VOID CustomInstrumentation(IMG img, VOID *v)
       {
         RTN_Open(allocRtn);
         
-        // Record RtlAllocateHeap size
         RTN_InsertCall(allocRtn, IPOINT_BEFORE, (AFUNPTR)LogBeforeMalloc,
-          IARG_FUNCARG_ENTRYPOINT_VALUE, 2, IARG_END);
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 1,
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 2,
+          IARG_RETURN_IP,
+          IARG_END);
 
         // Record RtlAllocateHeap return address
         RTN_InsertCall(allocRtn, IPOINT_AFTER, (AFUNPTR)LogAfterMalloc,
-          IARG_FUNCRET_EXITPOINT_VALUE, IARG_END);
+          IARG_FUNCRET_EXITPOINT_VALUE, IARG_RETURN_IP, IARG_END);
         
         RTN_Close(allocRtn);
       }
@@ -242,11 +253,11 @@ VOID CustomInstrumentation(IMG img, VOID *v)
 
         // Record RtlReAllocateHeap freed_addr, size
         RTN_InsertCall(reallocRtn, IPOINT_BEFORE, (AFUNPTR)LogBeforeReAlloc,
-          IARG_FUNCARG_ENTRYPOINT_VALUE, 2, IARG_FUNCARG_ENTRYPOINT_VALUE, 3, IARG_END);
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 2, IARG_FUNCARG_ENTRYPOINT_VALUE, 3, IARG_RETURN_IP, IARG_END);
 
         // Record RtlReAllocateHeap return address
         RTN_InsertCall(reallocRtn, IPOINT_AFTER, (AFUNPTR)LogAfterReAlloc,
-          IARG_FUNCRET_EXITPOINT_VALUE, IARG_END);
+          IARG_FUNCRET_EXITPOINT_VALUE, IARG_RETURN_IP, IARG_END);
 
         RTN_Close(reallocRtn);
       }
@@ -260,7 +271,7 @@ VOID CustomInstrumentation(IMG img, VOID *v)
         RTN_Open(freeRtn);
 
         RTN_InsertCall(freeRtn, IPOINT_BEFORE, (AFUNPTR)LogFree,
-          IARG_FUNCARG_ENTRYPOINT_VALUE, 2,
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 2, IARG_RETURN_IP,
           IARG_END);
 
         RTN_Close(freeRtn);
@@ -275,10 +286,10 @@ VOID CustomInstrumentation(IMG img, VOID *v)
         RTN_Open(vrallocRtn);
 
         RTN_InsertCall(vrallocRtn, IPOINT_BEFORE, (AFUNPTR)LogBeforeVirtualAlloc,
-          IARG_FUNCARG_ENTRYPOINT_VALUE, 2, IARG_END);
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 2, IARG_RETURN_IP, IARG_END);
 
         RTN_InsertCall(vrallocRtn, IPOINT_AFTER, (AFUNPTR)LogAfterVirtualAlloc,
-          IARG_FUNCRET_EXITPOINT_VALUE, IARG_END);
+          IARG_FUNCRET_EXITPOINT_VALUE, IARG_RETURN_IP, IARG_END);
 
         RTN_Close(vrallocRtn);
       }
@@ -292,7 +303,7 @@ VOID CustomInstrumentation(IMG img, VOID *v)
         RTN_Open(vrfreeRtn);
 
         RTN_InsertCall(vrfreeRtn, IPOINT_BEFORE, (AFUNPTR)LogBeforeVirtualFree,
-          IARG_FUNCARG_ENTRYPOINT_VALUE, 1, IARG_END);
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 1, IARG_RETURN_IP, IARG_END);
 
         RTN_Close(vrfreeRtn);
       }
