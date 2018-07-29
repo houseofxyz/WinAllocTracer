@@ -18,12 +18,12 @@ KNOB<string> EntryPoint(KNOB_MODE_WRITEONCE, "pintool", "entrypoint", "main", "G
 KNOB<BOOL> EnumSymbols(KNOB_MODE_WRITEONCE, "pintool", "symbols", "0", "List Symbols");
 BOOL start_trace = false;
 
-VOID LogBeforeVirtualAlloc(ADDRINT size, ADDRINT ret)
+VOID LogBeforeVirtualAlloc(WINDOWS::HANDLE hProcess, ADDRINT lpAddress, WINDOWS::SIZE_T dwSize, WINDOWS::DWORD flAllocationType, WINDOWS::DWORD flProtect, ADDRINT ret)
 {
   if (!start_trace)
     return;
 
-  LogFile << "[*] VirtualAllocEx(" << dec << size << ")";
+  LogFile << "[*] VirtualAllocEx(" << hex << hProcess << ", " << hex << lpAddress << ", " << dec << dwSize << ", " << dec << flAllocationType << ", " << dec << flProtect <<")";
 }
 
 VOID LogAfterVirtualAlloc(ADDRINT addr, ADDRINT ret)
@@ -53,25 +53,25 @@ VOID LogAfterVirtualAlloc(ADDRINT addr, ADDRINT ret)
   }
 }
 
-VOID LogBeforeVirtualFree(ADDRINT addr, ADDRINT ret)
+VOID LogBeforeVirtualFree(WINDOWS::HANDLE hProcess, ADDRINT lpAddress, WINDOWS::SIZE_T dwSize, WINDOWS::DWORD dwFreeType, ADDRINT ret)
 {
   if (!start_trace)
     return;
 
-  map<ADDRINT, bool>::iterator it = MallocMap.find(addr);
+  map<ADDRINT, bool>::iterator it = MallocMap.find(lpAddress);
 
   if (it != MallocMap.end())
   {
     if (it->second)
-      LogFile << "[*] Memory at address 0x" << hex << addr << " has been freed more than once (double free)." << endl;
+      LogFile << "[*] Memory at address 0x" << hex << lpAddress << " has been freed more than once (double free)." << endl;
     else
     {
       it->second = true;    // Mark it as freed
-      LogFile << "[*] VirtualFreeEx(0x" << hex << addr << ")" << endl;
+      LogFile << "[*] VirtualFreeEx(0x" << hex << hProcess << ", " << hex << lpAddress << ", " << dwSize << ", " << dwFreeType << ")" << endl;
     }
   }
   else
-    LogFile << "[*] Freeing unallocated memory at address 0x" << hex << addr << " (invalid free)." << endl;
+    LogFile << "[*] Freeing unallocated memory at address 0x" << hex << lpAddress << " (invalid free)." << endl;
 }
 
 VOID LogBeforeReAlloc(WINDOWS::HANDLE hHeap, WINDOWS::DWORD dwFlags, ADDRINT freed_addr, WINDOWS::DWORD dwBytes, ADDRINT ret)
@@ -148,25 +148,25 @@ VOID LogAfterMalloc(ADDRINT addr, ADDRINT ret)
   }
 }
 
-VOID LogFree(ADDRINT addr, ADDRINT ret)
+VOID LogFree(WINDOWS::HANDLE hHeap, WINDOWS::DWORD dwFlags, ADDRINT BaseAddress, ADDRINT ret)
 {
   if (!start_trace)
     return;
 
-  map<ADDRINT, bool>::iterator it = MallocMap.find(addr);
+  map<ADDRINT, bool>::iterator it = MallocMap.find(BaseAddress);
 
   if (it != MallocMap.end())
   {
     if (it->second)
-      LogFile << "[*] Memory at address 0x" << hex << addr << " has been freed more than once (double free)." << endl;
+      LogFile << "[*] Memory at address 0x" << hex << BaseAddress << " has been freed more than once (double free)." << endl;
     else
     {
       it->second = true;    // Mark it as freed
-      LogFile << "[*] RtlFreeHeap(0x" << hex << addr << ")" << endl;
+      LogFile << "[*] RtlFreeHeap(" << hex << hHeap << ", " << dwFlags << ", 0x" << hex << BaseAddress << ")" << endl;
     }
   }
   else
-    LogFile << "[*] Freeing unallocated memory at address 0x" << hex << addr << " (invalid free)." << endl;
+    LogFile << "[*] Freeing unallocated memory at address 0x" << hex << BaseAddress << " (invalid free)." << endl;
 }
 
 VOID BeforeMain() {
@@ -243,7 +243,9 @@ VOID CustomInstrumentation(IMG img, VOID *v)
 
         // Record RtlAllocateHeap return address and IP of caller function
         RTN_InsertCall(allocRtn, IPOINT_AFTER, (AFUNPTR)LogAfterMalloc,
-          IARG_FUNCRET_EXITPOINT_VALUE, IARG_RETURN_IP, IARG_END);
+          IARG_FUNCRET_EXITPOINT_VALUE, 
+          IARG_RETURN_IP, 
+          IARG_END);
         
         RTN_Close(allocRtn);
       }
@@ -271,7 +273,9 @@ VOID CustomInstrumentation(IMG img, VOID *v)
 
         // Record RtlReAllocateHeap return address and IP of caller function
         RTN_InsertCall(reallocRtn, IPOINT_AFTER, (AFUNPTR)LogAfterReAlloc,
-          IARG_FUNCRET_EXITPOINT_VALUE, IARG_RETURN_IP, IARG_END);
+          IARG_FUNCRET_EXITPOINT_VALUE, 
+          IARG_RETURN_IP, 
+          IARG_END);
 
         RTN_Close(reallocRtn);
       }
@@ -290,7 +294,10 @@ VOID CustomInstrumentation(IMG img, VOID *v)
         //  _Frees_ptr_opt_ PVOID BaseAddress
         //);
         RTN_InsertCall(freeRtn, IPOINT_BEFORE, (AFUNPTR)LogFree,
-          IARG_FUNCARG_ENTRYPOINT_VALUE, 2, IARG_RETURN_IP,
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 1, 
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 2, 
+          IARG_RETURN_IP,
           IARG_END);
 
         RTN_Close(freeRtn);
@@ -312,7 +319,13 @@ VOID CustomInstrumentation(IMG img, VOID *v)
         //  _In_     DWORD  flProtect
         //);
         RTN_InsertCall(vrallocRtn, IPOINT_BEFORE, (AFUNPTR)LogBeforeVirtualAlloc,
-          IARG_FUNCARG_ENTRYPOINT_VALUE, 2, IARG_RETURN_IP, IARG_END);
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 1, 
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 2, 
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 3, 
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 4, 
+          IARG_RETURN_IP, 
+          IARG_END);
 
         RTN_InsertCall(vrallocRtn, IPOINT_AFTER, (AFUNPTR)LogAfterVirtualAlloc,
           IARG_FUNCRET_EXITPOINT_VALUE, IARG_RETURN_IP, IARG_END);
@@ -335,7 +348,12 @@ VOID CustomInstrumentation(IMG img, VOID *v)
         //  _In_ DWORD  dwFreeType
         //);
         RTN_InsertCall(vrfreeRtn, IPOINT_BEFORE, (AFUNPTR)LogBeforeVirtualFree,
-          IARG_FUNCARG_ENTRYPOINT_VALUE, 1, IARG_RETURN_IP, IARG_END);
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 0, 
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 1, 
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 2, 
+          IARG_FUNCARG_ENTRYPOINT_VALUE, 3, 
+          IARG_RETURN_IP, 
+          IARG_END);
 
         RTN_Close(vrfreeRtn);
       }
