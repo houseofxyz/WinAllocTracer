@@ -101,6 +101,3 @@ Also, lots of inspiration from:
 * http://github.com/joxeankoret/membugtool
 * https://github.com/JonathanSalwan/PinTools
 
-### License
-
-This code is available under the LGPL license and without any support.
