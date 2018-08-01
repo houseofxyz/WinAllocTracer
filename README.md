@@ -16,7 +16,7 @@ Potential uses of this `Pintool` include, but are not limited to:
 
 ### Building
 
-* Built with Visual Studio 2015/2017
+* Built with Pin 3.7 & Visual Studio 2015/2017
 
 
 ### Using the Pintool
