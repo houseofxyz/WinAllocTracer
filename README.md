@@ -1,5 +1,4 @@
-WinMallocTracer
-===============
+## WinMallocTracer
 
 [Pin-based tool](https://software.intel.com/en-us/articles/pin-a-dynamic-binary-instrumentation-tool)
 
@@ -10,20 +9,17 @@ Potential uses of this `Pintool` include, but are not limited to:
 * Detect `memory leaks`
 * Detect `use after frees`
 
-Status
-======
+### Status
 
 * This is work in progress
 * Proof of concept code, tested in a small number of situations
 
-Building
-========
+### Building
 
 * Built with Visual Studio 2015/2017
 
 
-Using the Pintool
-=================
+### Using the Pintool
 
 ```
 C:\pin>pin -t source\tools\WinMallocTracer\Release\WinMallocTracer.dll -- C:\TARGET\testcase.exe
@@ -96,13 +92,15 @@ C:\pin>type memprofile.out
 [Memory Leak] Memory at address 0x5cddb8 has been allocated but not freed
 ```
 
-Acknowledgment
-==============
+### Acknowledgment
 
-This code is based on the sample `Pin` tools distributed as part of the `Pin` package.
-Started as a PoC for [http://deniable.org/reversing/binary-instrumentation](http://deniable.org/reversing/binary-instrumentation).
+* This code is based on the sample `Pin` tools distributed as part of the `Pin` package.
+* Started as a PoC for [http://deniable.org/reversing/binary-instrumentation](http://deniable.org/reversing/binary-instrumentation).
 
-License
-=======
+Also, lots of inspiration from:
+* http://github.com/joxeankoret/membugtool
+* https://github.com/JonathanSalwan/PinTools
+
+### License
 
 This code is available under the LGPL license and without any support.
