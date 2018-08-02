@@ -17,7 +17,8 @@ void my_simple_uaf()
   c = buffer[0];
 }
 
-int my_heap_functions() {
+int my_heap_functions() 
+{
   HLOCAL h1 = 0, h2 = 0, h3 = 0, h4 = 0;
 
   h1 = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 128);
@@ -33,7 +34,8 @@ int my_heap_functions() {
   return 0;
 }
 
-int my_double_free() {
+int my_double_free() 
+{
   LPVOID lpvBase;
   DWORD dwPageSize;
   BOOL bSuccess;
@@ -64,7 +66,8 @@ int my_double_free() {
   return 0;
 }
 
-int main(void) {
+int main(void) 
+{
   my_simple_uaf();
   my_heap_functions();
   my_double_free();
