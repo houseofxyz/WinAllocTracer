@@ -47,18 +47,18 @@ C:\pin>pin -t source\tools\WinMallocTracer\Release\WinMallocTracer.dll -- C:\TAR
     Low Adress : 1884291072, High Address : 1884303359
 [+] Loading C:\Windows\SysWOW64\api-ms-win-core-synch-l1-2-0.dll, Image id = 12
     Low Adress : 1879900160, High Address : 1879912447
-Unloading imageC:\TARGET\testcase.exe
-Unloading imageC:\Windows\syswow64\KERNELBASE.dll
-Unloading imageC:\Windows\syswow64\kernel32.dll
-Unloading imageC:\Windows\SysWOW64\ntdll.dll
-Unloading imageC:\Windows\SysWOW64\vcruntime140d.dll
-Unloading imageC:\Windows\SysWOW64\ucrtbased.dll
-Unloading imageC:\Windows\SysWOW64\api-ms-win-core-localization-l1-2-0.dll
-Unloading imageC:\Windows\SysWOW64\api-ms-win-core-processthreads-l1-1-1.dll
-Unloading imageC:\Windows\SysWOW64\api-ms-win-core-file-l1-2-0.dll
-Unloading imageC:\Windows\SysWOW64\api-ms-win-core-timezone-l1-1-0.dll
-Unloading imageC:\Windows\SysWOW64\api-ms-win-core-file-l2-1-0.dll
-Unloading imageC:\Windows\SysWOW64\api-ms-win-core-synch-l1-2-0.dll
+[+] Unloading image C:\TARGET\testcase.exe
+[+] Unloading image C:\Windows\syswow64\KERNELBASE.dll
+[+] Unloading image C:\Windows\syswow64\kernel32.dll
+[+] Unloading image C:\Windows\SysWOW64\ntdll.dll
+[+] Unloading image C:\Windows\SysWOW64\vcruntime140d.dll
+[+] Unloading image C:\Windows\SysWOW64\ucrtbased.dll
+[+] Unloading image C:\Windows\SysWOW64\api-ms-win-core-localization-l1-2-0.dll
+[+] Unloading image C:\Windows\SysWOW64\api-ms-win-core-processthreads-l1-1-1.dll
+[+] Unloading image C:\Windows\SysWOW64\api-ms-win-core-file-l1-2-0.dll
+[+] Unloading image C:\Windows\SysWOW64\api-ms-win-core-timezone-l1-1-0.dll
+[+] Unloading image C:\Windows\SysWOW64\api-ms-win-core-file-l2-1-0.dll
+[+] Unloading image C:\Windows\SysWOW64\api-ms-win-core-synch-l1-2-0.dll
 
 C:\pin>type memprofile.out
 [+] Memory tracing for PID = 4532
