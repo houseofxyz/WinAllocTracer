@@ -101,7 +101,7 @@ C:\pin>pin.exe -pause_tool 20 -t source\tools\MallocTracer\Release\MallocTracer.
 Pausing for 20 seconds to attach to process with pid 1568
 ```
 
-If you want to `break` when a memory issue is found, use `-appdebug` and attach to the remote `gdb` server. A `breakpoint` will trigger everytime a memory issue is found (`double free`s and `use after free`s only for now actually).
+If you want to `break` when a memory issue is found, use `-appdebug` and attach to the remote `gdb` server. A `breakpoint` will trigger everytime a memory issue is found (`double free` and `use after free` only for now actually).
 
 ```
 C:\pin>pin.exe -appdebug -t source\tools\WinMallocTracer\Release\WinMallocTracer.dll -- C:\TARGET\testcase.exe
