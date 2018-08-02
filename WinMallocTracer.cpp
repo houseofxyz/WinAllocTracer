@@ -558,7 +558,8 @@ VOID ReadWriteMem_callback(ADDRINT insAddr, std::string *insDis, UINT32 opCount,
   if (!isAddressInMainExe(insAddr))
     return;
 
-  for (it = AllocList.begin(); it != AllocList.end(); ++it) {
+  for (it = AllocList.begin(); it != AllocList.end(); ++it) 
+  {
     if (addr >= it->addr && addr < (it->addr + it->size) && it->free == true) 
     {
       LogFile << "[Use After Free] Chunk: 0x" << addr << "\tInstruction: 0x" << insAddr << "\t" << *insDis << endl;
@@ -583,7 +584,8 @@ VOID Instruction_callback(INS ins, VOID *v)
     IARG_FAST_ANALYSIS_CALL, IARG_CONST_CONTEXT,
     IARG_END);
 
-  if (INS_OperandCount(ins) > 1 && INS_IsMemoryRead(ins) && INS_OperandIsMemory(ins, 1) && INS_OperandIsReg(ins, 0)) {
+  if (INS_OperandCount(ins) > 1 && INS_IsMemoryRead(ins) && INS_OperandIsMemory(ins, 1) && INS_OperandIsReg(ins, 0)) 
+  {
     INS_InsertCall(
       ins, IPOINT_BEFORE, (AFUNPTR)ReadWriteMem_callback,
       IARG_ADDRINT, INS_Address(ins),
@@ -595,7 +597,8 @@ VOID Instruction_callback(INS ins, VOID *v)
       IARG_END);
   }
 
-  if (INS_OperandCount(ins) > 1 && INS_IsMemoryWrite(ins)) {
+  if (INS_OperandCount(ins) > 1 && INS_IsMemoryWrite(ins)) 
+  {
     INS_InsertCall(
       ins, IPOINT_BEFORE, (AFUNPTR)ReadWriteMem_callback,
       IARG_ADDRINT, INS_Address(ins),
