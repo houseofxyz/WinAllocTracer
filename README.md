@@ -14,7 +14,7 @@ Potential uses of this `Pintool` include, but are not limited to:
 * This is work in progress
 * Proof of concept code, tested in a small number of situations
 
-### Building
+### Building 
 
 * Built with Pin 3.7 & Visual Studio 2015/2017
 
@@ -90,6 +90,25 @@ C:\pin>type memprofile.out
 [Double Free] Memory at address 0x2720000 has been freed more than once (Caller IP: 0x75fef07f)
 [Memory Leak] Memory at address 0x5cea78 has been allocated but not freed
 [Memory Leak] Memory at address 0x5cddb8 has been allocated but not freed
+```
+
+### Debugging
+
+To debug the `Pintool` use the `-pause_tool` switch and specify the number of seconds to wait until you attach the debugger to its process.
+
+```
+C:\pin>pin.exe -pause_tool 20 -t source\tools\MallocTracer\Release\MallocTracer.dll -- C:\TARGET\testcase.exe 
+Pausing for 20 seconds to attach to process with pid 1568
+```
+
+If you want to `break` when a memory issue is found, use `-appdebug` and attach to the remote `gdb` server. A `breakpoint` will trigger everytime a memory issue is found (`double free`s and `use after free`s only for now actually).
+
+```
+C:\pin>pin.exe -appdebug -t source\tools\WinMallocTracer\Release\WinMallocTracer.dll -- C:\TARGET\testcase.exe
+(...)
+Application stopped until continued from debugger.
+Pin ready to accept debugger connection on port 60094
+(...)
 ```
 
 ### Acknowledgment

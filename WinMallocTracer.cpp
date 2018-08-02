@@ -1,6 +1,23 @@
 #include "WinMallocTracer.h"
 
-VOID LogBeforeMalloc(WINDOWS::HANDLE hHeap, WINDOWS::DWORD dwFlags, WINDOWS::DWORD dwSize, ADDRINT ret)
+std::vector<alloc_chunk_t> AllocList;
+ofstream LogFile;
+BOOL start_trace = false;
+alloc_chunk_t tmp_chunk;
+std::string breakpoint_msg;
+BOOL is_breakpoint_set = false;
+//vector<string> ModulesList;
+KNOB<string> LogFileName(KNOB_MODE_WRITEONCE, "pintool", "o", "memprofile.out", "Memory trace file name");
+KNOB<string> EntryPoint(KNOB_MODE_WRITEONCE, "pintool", "entrypoint", "main", "Guest entry-point function");
+KNOB<BOOL> EnumSymbols(KNOB_MODE_WRITEONCE, "pintool", "symbols", "0", "List Symbols");
+
+VOID SetBreakpointMsg(std::string msg)
+{
+  is_breakpoint_set = true;
+  breakpoint_msg = msg;
+}
+
+VOID BeforeMalloc(WINDOWS::HANDLE hHeap, WINDOWS::DWORD dwFlags, WINDOWS::DWORD dwSize, ADDRINT ret)
 {
   PIN_LockClient();
 
@@ -18,7 +35,7 @@ VOID LogBeforeMalloc(WINDOWS::HANDLE hHeap, WINDOWS::DWORD dwFlags, WINDOWS::DWO
   PIN_UnlockClient();
 }
 
-VOID LogAfterMalloc(ADDRINT addr, ADDRINT ret)
+VOID AfterMalloc(ADDRINT addr, ADDRINT ret)
 {
   PIN_LockClient();
 
@@ -37,7 +54,7 @@ VOID LogAfterMalloc(ADDRINT addr, ADDRINT ret)
 
   std::vector<alloc_chunk_t>::iterator it;
 
-  for (it = MallocMap.begin(); it != MallocMap.end(); ++it)
+  for (it = AllocList.begin(); it != AllocList.end(); ++it)
   {
     if (it->addr == addr)
     {
@@ -50,18 +67,18 @@ VOID LogAfterMalloc(ADDRINT addr, ADDRINT ret)
     }
   }
 
-  if (it == MallocMap.end())
+  if (it == AllocList.end())
   {
     tmp_chunk.addr = addr;
     tmp_chunk.free = false;
-    MallocMap.push_back(tmp_chunk);
+    AllocList.push_back(tmp_chunk);
     LogFile << "\t\t= 0x" << hex << addr << endl;
   }
   
   PIN_UnlockClient();
 }
 
-VOID LogBeforeFree(WINDOWS::HANDLE hHeap, WINDOWS::DWORD dwFlags, ADDRINT BaseAddress, ADDRINT ret)
+VOID BeforeFree(WINDOWS::HANDLE hHeap, WINDOWS::DWORD dwFlags, ADDRINT BaseAddress, ADDRINT ret)
 {
   PIN_LockClient();
 
@@ -72,13 +89,14 @@ VOID LogBeforeFree(WINDOWS::HANDLE hHeap, WINDOWS::DWORD dwFlags, ADDRINT BaseAd
   }
 
   std::vector<alloc_chunk_t>::iterator it;
-  for (it = MallocMap.begin(); it != MallocMap.end(); ++it)
+  for (it = AllocList.begin(); it != AllocList.end(); ++it)
   {
     if (it->addr == BaseAddress)
     {
       if (it->free)
       {
         LogFile << "[Double Free] Memory at address 0x" << hex << BaseAddress << " has been freed more than once (Caller IP: 0x" << ret << ")" << endl;
+        SetBreakpointMsg(" Breakpoint Hit! Double Free!!!");
         break;
       }
       else
@@ -90,13 +108,19 @@ VOID LogBeforeFree(WINDOWS::HANDLE hHeap, WINDOWS::DWORD dwFlags, ADDRINT BaseAd
     }
   }
 
-  if (it == MallocMap.end())
+  if (it == AllocList.end())
     LogFile << "[Invalid Free] Freeing unallocated memory at address 0x" << hex << BaseAddress << endl;
   
   PIN_UnlockClient();
 }
 
-VOID LogBeforeReAlloc(WINDOWS::HANDLE hHeap, WINDOWS::DWORD dwFlags, ADDRINT freed_addr, WINDOWS::DWORD dwBytes, ADDRINT ret)
+//VOID AfterFree(VOID)
+//{
+//  PIN_LockClient();
+//  PIN_UnlockClient();
+//}
+
+VOID BeforeReAlloc(WINDOWS::HANDLE hHeap, WINDOWS::DWORD dwFlags, ADDRINT freed_addr, WINDOWS::DWORD dwBytes, ADDRINT ret)
 {
   PIN_LockClient();
 
@@ -108,7 +132,7 @@ VOID LogBeforeReAlloc(WINDOWS::HANDLE hHeap, WINDOWS::DWORD dwFlags, ADDRINT fre
 
   std::vector<alloc_chunk_t>::iterator it;
 
-  for (it = MallocMap.begin(); it != MallocMap.end(); ++it)
+  for (it = AllocList.begin(); it != AllocList.end(); ++it)
   {
     if (it->addr == freed_addr)
     {
@@ -117,7 +141,7 @@ VOID LogBeforeReAlloc(WINDOWS::HANDLE hHeap, WINDOWS::DWORD dwFlags, ADDRINT fre
       break;
     }
 
-    if (it == MallocMap.end())
+    if (it == AllocList.end())
       LogFile << "[-] RtlHeapRealloc could not find addr to free??? - " << freed_addr << endl;
   }
 
@@ -126,7 +150,7 @@ VOID LogBeforeReAlloc(WINDOWS::HANDLE hHeap, WINDOWS::DWORD dwFlags, ADDRINT fre
   PIN_UnlockClient();
 }
 
-VOID LogAfterReAlloc(ADDRINT addr, ADDRINT ret)
+VOID AfterReAlloc(ADDRINT addr, ADDRINT ret)
 {
   PIN_LockClient();
 
@@ -143,7 +167,7 @@ VOID LogAfterReAlloc(ADDRINT addr, ADDRINT ret)
   }
 
   std::vector<alloc_chunk_t>::iterator it;
-  for (it = MallocMap.begin(); it != MallocMap.end(); ++it)
+  for (it = AllocList.begin(); it != AllocList.end(); ++it)
   {
     if (it->addr == addr)
     {
@@ -157,7 +181,7 @@ VOID LogAfterReAlloc(ADDRINT addr, ADDRINT ret)
   PIN_UnlockClient();
 }
 
-VOID LogBeforeVirtualAlloc(WINDOWS::HANDLE hProcess, ADDRINT lpAddress, WINDOWS::SIZE_T dwSize, WINDOWS::DWORD flAllocationType, WINDOWS::DWORD flProtect, ADDRINT ret)
+VOID BeforeVirtualAlloc(WINDOWS::HANDLE hProcess, ADDRINT lpAddress, WINDOWS::SIZE_T dwSize, WINDOWS::DWORD flAllocationType, WINDOWS::DWORD flProtect, ADDRINT ret)
 {
   PIN_LockClient();
 
@@ -175,7 +199,7 @@ VOID LogBeforeVirtualAlloc(WINDOWS::HANDLE hProcess, ADDRINT lpAddress, WINDOWS:
   PIN_UnlockClient();
 }
 
-VOID LogAfterVirtualAlloc(ADDRINT addr, ADDRINT ret)
+VOID AfterVirtualAlloc(ADDRINT addr, ADDRINT ret)
 {
   PIN_LockClient();
 
@@ -194,7 +218,7 @@ VOID LogAfterVirtualAlloc(ADDRINT addr, ADDRINT ret)
 
   std::vector<alloc_chunk_t>::iterator it;
   
-  for (it = MallocMap.begin(); it != MallocMap.end(); ++it)
+  for (it = AllocList.begin(); it != AllocList.end(); ++it)
   {
     if (it->addr == addr)
     {
@@ -207,18 +231,18 @@ VOID LogAfterVirtualAlloc(ADDRINT addr, ADDRINT ret)
     }
   }
 
-  if (it == MallocMap.end())
+  if (it == AllocList.end())
   {
     tmp_chunk.addr = addr;
     tmp_chunk.free = false;
-    MallocMap.push_back(tmp_chunk);
+    AllocList.push_back(tmp_chunk);
     LogFile << "\t\t= 0x" << hex << addr << endl;
   }
   
   PIN_UnlockClient();
 }
 
-VOID LogBeforeVirtualFree(WINDOWS::HANDLE hProcess, ADDRINT lpAddress, WINDOWS::SIZE_T dwSize, WINDOWS::DWORD dwFreeType, ADDRINT ret)
+VOID BeforeVirtualFree(WINDOWS::HANDLE hProcess, ADDRINT lpAddress, WINDOWS::SIZE_T dwSize, WINDOWS::DWORD dwFreeType, ADDRINT ret)
 {
   PIN_LockClient();
 
@@ -229,13 +253,14 @@ VOID LogBeforeVirtualFree(WINDOWS::HANDLE hProcess, ADDRINT lpAddress, WINDOWS::
   }
 
   std::vector<alloc_chunk_t>::iterator it;
-  for (it = MallocMap.begin(); it != MallocMap.end(); ++it)
+  for (it = AllocList.begin(); it != AllocList.end(); ++it)
   {
     if (it->addr == lpAddress)
     {
       if(it->free)
       {
         LogFile << "[Double Free] Memory at address 0x" << hex << lpAddress << " has been freed more than once (Caller IP: 0x" << ret << ")" << endl;
+        SetBreakpointMsg(" Breakpoint Hit! Double Free!!!");
         break;
       }
       else
@@ -247,11 +272,17 @@ VOID LogBeforeVirtualFree(WINDOWS::HANDLE hProcess, ADDRINT lpAddress, WINDOWS::
     }
   }
   
-  if (it == MallocMap.end())
+  if (it == AllocList.end())
     LogFile << "[Invalid Free] Freeing unallocated memory at address 0x" << hex << lpAddress << endl;
   
   PIN_UnlockClient();
 }
+
+//VOID AfterVirtualFree(VOID)
+//{
+//  PIN_LockClient();
+//  PIN_UnlockClient();
+//}
 
 VOID BeforeMain() {
   PIN_LockClient();
@@ -268,10 +299,12 @@ VOID AfterMain() {
   PIN_UnlockClient();
 }
 
-VOID CustomInstrumentation(IMG img, VOID *v)
+VOID Image_callback(IMG img, VOID *v)
 {
   cout << "[+] Loading " << IMG_Name(img).c_str() << ", Image id = " << IMG_Id(img) << endl;
   cout << "    Low Adress : " << IMG_LowAddress(img) << ", High Address : " << IMG_HighAddress(img) << endl;
+
+  //ModulesList.push_back(IMG_Name(img).c_str());
 
   if (IMG_IsMainExecutable(img))
   {
@@ -326,7 +359,7 @@ VOID CustomInstrumentation(IMG img, VOID *v)
         //  ULONG  Flags,
         //  SIZE_T Size
         //);
-        RTN_InsertCall(allocRtn, IPOINT_BEFORE, (AFUNPTR)LogBeforeMalloc,
+        RTN_InsertCall(allocRtn, IPOINT_BEFORE, (AFUNPTR)BeforeMalloc,
           IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
           IARG_FUNCARG_ENTRYPOINT_VALUE, 1,
           IARG_FUNCARG_ENTRYPOINT_VALUE, 2,
@@ -334,7 +367,7 @@ VOID CustomInstrumentation(IMG img, VOID *v)
           IARG_END);
 
         // Record RtlAllocateHeap return address and IP of caller function
-        RTN_InsertCall(allocRtn, IPOINT_AFTER, (AFUNPTR)LogAfterMalloc,
+        RTN_InsertCall(allocRtn, IPOINT_AFTER, (AFUNPTR)AfterMalloc,
           IARG_FUNCRET_EXITPOINT_VALUE, 
           IARG_RETURN_IP, 
           IARG_END);
@@ -355,7 +388,7 @@ VOID CustomInstrumentation(IMG img, VOID *v)
         //  IN ULONG  Flags,
         //  IN PVOID  MemoryPointer,
         //  IN ULONG  Size);
-        RTN_InsertCall(reallocRtn, IPOINT_BEFORE, (AFUNPTR)LogBeforeReAlloc,
+        RTN_InsertCall(reallocRtn, IPOINT_BEFORE, (AFUNPTR)BeforeReAlloc,
           IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
           IARG_FUNCARG_ENTRYPOINT_VALUE, 1,
           IARG_FUNCARG_ENTRYPOINT_VALUE, 2,
@@ -364,7 +397,7 @@ VOID CustomInstrumentation(IMG img, VOID *v)
           IARG_END);
 
         // Record RtlReAllocateHeap return address and IP of caller function
-        RTN_InsertCall(reallocRtn, IPOINT_AFTER, (AFUNPTR)LogAfterReAlloc,
+        RTN_InsertCall(reallocRtn, IPOINT_AFTER, (AFUNPTR)AfterReAlloc,
           IARG_FUNCRET_EXITPOINT_VALUE, 
           IARG_RETURN_IP, 
           IARG_END);
@@ -385,12 +418,15 @@ VOID CustomInstrumentation(IMG img, VOID *v)
         //  ULONG                 Flags,
         //  _Frees_ptr_opt_ PVOID BaseAddress
         //);
-        RTN_InsertCall(freeRtn, IPOINT_BEFORE, (AFUNPTR)LogBeforeFree,
+        RTN_InsertCall(freeRtn, IPOINT_BEFORE, (AFUNPTR)BeforeFree,
           IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
           IARG_FUNCARG_ENTRYPOINT_VALUE, 1, 
           IARG_FUNCARG_ENTRYPOINT_VALUE, 2, 
           IARG_RETURN_IP,
           IARG_END);
+
+        //RTN_InsertCall(freeRtn, IPOINT_BEFORE, (AFUNPTR)AfterFree,
+        //  IARG_END);
 
         RTN_Close(freeRtn);
       }
@@ -410,7 +446,7 @@ VOID CustomInstrumentation(IMG img, VOID *v)
         //  _In_     DWORD  flAllocationType,
         //  _In_     DWORD  flProtect
         //);
-        RTN_InsertCall(vrallocRtn, IPOINT_BEFORE, (AFUNPTR)LogBeforeVirtualAlloc,
+        RTN_InsertCall(vrallocRtn, IPOINT_BEFORE, (AFUNPTR)BeforeVirtualAlloc,
           IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
           IARG_FUNCARG_ENTRYPOINT_VALUE, 1, 
           IARG_FUNCARG_ENTRYPOINT_VALUE, 2, 
@@ -419,7 +455,7 @@ VOID CustomInstrumentation(IMG img, VOID *v)
           IARG_RETURN_IP, 
           IARG_END);
 
-        RTN_InsertCall(vrallocRtn, IPOINT_AFTER, (AFUNPTR)LogAfterVirtualAlloc,
+        RTN_InsertCall(vrallocRtn, IPOINT_AFTER, (AFUNPTR)AfterVirtualAlloc,
           IARG_FUNCRET_EXITPOINT_VALUE, IARG_RETURN_IP, IARG_END);
 
         RTN_Close(vrallocRtn);
@@ -439,7 +475,7 @@ VOID CustomInstrumentation(IMG img, VOID *v)
         //  _In_ SIZE_T dwSize,
         //  _In_ DWORD  dwFreeType
         //);
-        RTN_InsertCall(vrfreeRtn, IPOINT_BEFORE, (AFUNPTR)LogBeforeVirtualFree,
+        RTN_InsertCall(vrfreeRtn, IPOINT_BEFORE, (AFUNPTR)BeforeVirtualFree,
           IARG_FUNCARG_ENTRYPOINT_VALUE, 0, 
           IARG_FUNCARG_ENTRYPOINT_VALUE, 1, 
           IARG_FUNCARG_ENTRYPOINT_VALUE, 2, 
@@ -447,17 +483,20 @@ VOID CustomInstrumentation(IMG img, VOID *v)
           IARG_RETURN_IP, 
           IARG_END);
 
+        //RTN_InsertCall(vrfreeRtn, IPOINT_BEFORE, (AFUNPTR)AfterVirtualFree,
+        //  IARG_END);
+
         RTN_Close(vrfreeRtn);
       }
     }
   }
 }
 
-VOID FinalFunc(INT32 code, VOID *v)
+VOID Fini_callback(INT32 code, VOID *v)
 {
   std::vector<alloc_chunk_t>::iterator it;
 
-  for (it = MallocMap.begin(); it != MallocMap.end(); ++it)
+  for (it = AllocList.begin(); it != AllocList.end(); ++it)
   {
     if (!it->free)
       LogFile << "[Memory Leak] Memory at address 0x" << hex << it->addr << " has been allocated but not freed" << endl;
@@ -466,10 +505,32 @@ VOID FinalFunc(INT32 code, VOID *v)
   LogFile.close();
 }
 
-VOID image_unload_callback(IMG img, VOID *v)
+VOID ImageUnload_callback(IMG img, VOID *v)
 {
-  cout << "Unloading image" << IMG_Name(img).c_str() << endl;
+  cout << "[+] Unloading image " << IMG_Name(img).c_str() << endl;
 }
+
+// used for debug
+//BOOL isAddressInModule(ADDRINT addr)
+//{
+//  PIN_LockClient();
+//  IMG img = IMG_FindByAddress(addr);
+//  string path = (IMG_Valid(img) ? IMG_Name(img) : "Invalid Img");
+//  auto it = std::find(ModulesList.begin(), ModulesList.end(), path);
+//  
+//  cout << "MODULE path: " << path << endl;
+//  
+//  if (it != ModulesList.end())
+//  {
+//    PIN_UnlockClient();
+//    return TRUE;
+//  }
+//  else
+//  {
+//    PIN_UnlockClient();
+//    return FALSE;
+//  }
+//}
 
 BOOL isAddressInMainExe(ADDRINT addr)
 {
@@ -486,7 +547,7 @@ BOOL isAddressInMainExe(ADDRINT addr)
   return ret;
 }
 
-VOID ReadWriteMem(ADDRINT insAddr, std::string *insDis, UINT32 opCount, REG reg_r, ADDRINT memOp, ADDRINT sp)
+VOID ReadWriteMem_callback(ADDRINT insAddr, std::string *insDis, UINT32 opCount, REG reg_r, ADDRINT memOp, ADDRINT sp)
 {
   std::vector<alloc_chunk_t>::iterator it;
   ADDRINT addr = memOp;
@@ -497,20 +558,34 @@ VOID ReadWriteMem(ADDRINT insAddr, std::string *insDis, UINT32 opCount, REG reg_
   if (!isAddressInMainExe(insAddr))
     return;
 
-  for (it = MallocMap.begin(); it != MallocMap.end(); ++it) {
+  for (it = AllocList.begin(); it != AllocList.end(); ++it) {
     if (addr >= it->addr && addr < (it->addr + it->size) && it->free == true) 
     {
       LogFile << "[Use After Free] Chunk: 0x" << addr << "\tInstruction: 0x" << insAddr << "\t" << *insDis << endl;
+      SetBreakpointMsg(" Breakpoint Hit! Use After Free!!!");
       return;
     }
   }
 }
 
-VOID Instruction(INS ins, VOID *v)
+VOID PIN_FAST_ANALYSIS_CALL InsInstruction_callback(const CONTEXT *ctx)
 {
+  if (is_breakpoint_set)
+  {
+    if (PIN_GetDebugStatus() == DEBUG_STATUS_CONNECTED)
+      PIN_ApplicationBreakpoint(ctx, PIN_ThreadId(), FALSE, breakpoint_msg);
+  }
+}
+
+VOID Instruction_callback(INS ins, VOID *v)
+{
+  INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)InsInstruction_callback,
+    IARG_FAST_ANALYSIS_CALL, IARG_CONST_CONTEXT,
+    IARG_END);
+
   if (INS_OperandCount(ins) > 1 && INS_IsMemoryRead(ins) && INS_OperandIsMemory(ins, 1) && INS_OperandIsReg(ins, 0)) {
     INS_InsertCall(
-      ins, IPOINT_BEFORE, (AFUNPTR)ReadWriteMem,
+      ins, IPOINT_BEFORE, (AFUNPTR)ReadWriteMem_callback,
       IARG_ADDRINT, INS_Address(ins),
       IARG_PTR, new string(INS_Disassemble(ins)),
       IARG_UINT32, INS_OperandCount(ins),
@@ -522,7 +597,7 @@ VOID Instruction(INS ins, VOID *v)
 
   if (INS_OperandCount(ins) > 1 && INS_IsMemoryWrite(ins)) {
     INS_InsertCall(
-      ins, IPOINT_BEFORE, (AFUNPTR)ReadWriteMem,
+      ins, IPOINT_BEFORE, (AFUNPTR)ReadWriteMem_callback,
       IARG_ADDRINT, INS_Address(ins),
       IARG_PTR, new string(INS_Disassemble(ins)),
       IARG_UINT32, INS_OperandCount(ins),
@@ -542,12 +617,12 @@ int main(int argc, char *argv[])
   LogFile.open(LogFileName.Value().c_str());
   LogFile << "[+] Memory tracing for PID = " << PIN_GetPid() << endl << endl;
 
-  IMG_AddInstrumentFunction(CustomInstrumentation, NULL);
-  IMG_AddUnloadFunction(image_unload_callback, 0);
+  IMG_AddInstrumentFunction(Image_callback, NULL);
+  IMG_AddUnloadFunction(ImageUnload_callback, 0);
 
-  INS_AddInstrumentFunction(Instruction, 0);
+  INS_AddInstrumentFunction(Instruction_callback, 0);
 
-  PIN_AddFiniFunction(FinalFunc, NULL);
+  PIN_AddFiniFunction(Fini_callback, NULL);
   PIN_StartProgram();
 
   return 0;
