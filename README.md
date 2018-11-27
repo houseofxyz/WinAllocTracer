@@ -1,4 +1,4 @@
-## WinMallocTracer
+## WinAllocTracer
 
 [Pin-based tool](https://software.intel.com/en-us/articles/pin-a-dynamic-binary-instrumentation-tool)
 
@@ -22,7 +22,7 @@ Potential uses of this `Pintool` include, but are not limited to:
 ### Using the Pintool
 
 ```
-C:\pin>pin -t source\tools\WinMallocTracer\Release\WinMallocTracer.dll -- C:\TARGET\testcase.exe
+C:\pin>pin -t source\tools\WinAllocTracer\Release\WinAllocTracer.dll -- C:\TARGET\testcase.exe
 [+] Loading C:\TARGET\testcase.exe, Image id = 1
     Low Adress : 1638400, High Address : 1765375
 [+] Loading C:\Windows\syswow64\KERNELBASE.dll, Image id = 2
@@ -104,7 +104,7 @@ Pausing for 20 seconds to attach to process with pid 1568
 If you want to `break` when a memory issue is found, use `-appdebug` and attach to the remote `gdb` server. A `breakpoint` will trigger everytime a memory issue is found (`double free` and `use after free` only for now actually).
 
 ```
-C:\pin>pin.exe -appdebug -t source\tools\WinMallocTracer\Release\WinMallocTracer.dll -- C:\TARGET\testcase.exe
+C:\pin>pin.exe -appdebug -t source\tools\WinAllocTracer\Release\WinAllocTracer.dll -- C:\TARGET\testcase.exe
 (...)
 Application stopped until continued from debugger.
 Pin ready to accept debugger connection on port 60094

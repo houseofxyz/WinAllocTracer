@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="WinMallocTracer.cpp">
+    <ClCompile Include="WinAllocTracer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -23,5 +23,10 @@
     <None Include="..\README">
       <Filter>Documents</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="WinAllocTracer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
