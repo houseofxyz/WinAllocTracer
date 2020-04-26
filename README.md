@@ -16,8 +16,33 @@ Potential uses of this `Pintool` include, but are not limited to:
 
 ### Building 
 
-* Built with Pin 3.7 & Visual Studio 2015/2017
+* Built with Pin 3.13-98189 & Visual Studio 2019 (`x86` and `x64`)
+* If you run into problems please have a look here: https://software.intel.com/sites/default/files/managed/8e/f5/PinCRT.pdf
+* The pdf above is mirrored [here](PinCRT.pdf)
 
+Since I use `windows.h` in my Pintool, and Pin uses some base types that conflict with Windows types, we have to wrap the `windows.h` file as follows.
+
+```
+namespace WINDOWS
+{
+#include <windows.h>
+}
+```
+
+Items that reside in the `windows.h` are then referenced using the `WINDOWS::` prefix. Because of this there's an extra define you'll need to add to the compilation flags:
+
+```
+/D_WINDOWS_H_PATH_="$(ORIGINAL_WINDOWS_H_PATH)"
+```
+
+This is documented in the **pdf** file mentioned above. To add the `define` above, one possible solution is:
+
+1. open the project's properties (Right click -> `Properties`)
+2. go to `C/C++` -> `Preprocessor`
+3. edit `Preprocessor Definitions`
+4. add: `_WINDOWS_H_PATH_=C:\Program Files (x86)\Windows Kits\10\Include\10.0.18362.0\um`
+
+Note: Make sure you adjust the path above to your SDK version in use.
 
 ### Using the Pintool
 
