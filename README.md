@@ -17,8 +17,7 @@ Potential uses of this `Pintool` include, but are not limited to:
 ### Building 
 
 * Built with Pin 3.13-98189 & Visual Studio 2019 (`x86` and `x64`)
-* If you run into problems please have a look here: https://software.intel.com/sites/default/files/managed/8e/f5/PinCRT.pdf
-* The pdf above is mirrored [here](PinCRT.pdf)
+* If you run into problems please have a look here: https://software.intel.com/sites/default/files/managed/8e/f5/PinCRT.pdf (the pdf is mirrored [here](PinCRT.pdf))
 
 Since I use `windows.h` in my Pintool, and Pin uses some base types that conflict with Windows types, we have to wrap the `windows.h` file as follows.
 
