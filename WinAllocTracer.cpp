@@ -1,10 +1,4 @@
 #include "WinAllocTracer.h"
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
 
 std::vector<alloc_chunk_t> AllocList;
 ofstream LogFile;
