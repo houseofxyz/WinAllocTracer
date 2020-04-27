@@ -1,13 +1,13 @@
 #pragma once
 #include "pin.h"
-#include <iostream>
-#include <fstream>
-#include <map>
-
 namespace WINDOWS
 {
 #include <windows.h>
 }
+#include <iostream>
+#include <fstream>
+#include <map>
+#include <string>
 
 using namespace std;
 
