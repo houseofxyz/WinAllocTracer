@@ -43,6 +43,8 @@ This is documented in the **pdf** file mentioned above. To add the `define` abov
 
 Note: Make sure you adjust the path above to your SDK version in use.
 
+**Warning**: If you are playing with 64-bit binaries use Pin 3.11-97998. Version 3.13-98189 has some weird string conversion bug when tracing 64-bit binaries.
+
 ### Using the Pintool
 
 ```
